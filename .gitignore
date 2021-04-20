@@ -1,0 +1,11 @@
+/.bundle/
+/.yardoc
+/_yardoc/
+/doc/
+/pkg/
+/spec/reports/
+/tmp/
+*.sw*
+
+# rspec failure tracking
+.rspec_status
