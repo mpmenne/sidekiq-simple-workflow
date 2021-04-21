@@ -8,30 +8,55 @@ module Sidekiq
     class Error < StandardError; end
     attr_accessor :options
 
-    def perform(*args)
+    # rename to perform_async
+    def start_workflow(*args)
       @options = args.first
-      batch = Sidekiq::Batch.new
-      batch.jobs do
-        step_1_batch(batch.status, @options)
+      parent_batch = Sidekiq::Batch.new
+      parent_batch.description = "#{self.class} Parent Batch"
+      parent_batch.jobs do
+        step_1_batch(parent_batch.status, args.first)
       end
-      batch
+      parent_batch
     end
 
-    (1..10).each do |step_number|
+    def step_1_batch(status, args)
+      step_batch = nil
+      original_batch = Sidekiq::Batch.new(status.bid)
+      original_batch.jobs do
+        step_batch = Sidekiq::Batch.new
+        step_batch.description = "#{self.class} step_1 Batch"
+        if respond_to? :step_2
+          callback = "#{self.class}#step_2_batch"
+          step_batch.on(:complete, callback, args)
+        end
+        step_batch.jobs do
+          send(step_method_name(1), nil, args)
+          NoOpWorker.perform_async
+        end
+      end
+      step_batch
+    end
+
+    (2..10).each do |step_number|
       define_method("step_#{step_number}_batch") do |status, options|
         if respond_to? step_method_name(step_number)
-          overall = Sidekiq::Batch.new(status.parent_bid)
-          next_step_method = step_method_name(step_number + 1)
-          if respond_to? next_step_method
+          step_batch = nil
+          original_batch = Sidekiq::Batch.new(status.parent_bid)
+          original_batch.jobs do
+            step_batch = Sidekiq::Batch.new
+            step_batch.description = "#{self.class} step_#{step_number} Batch"
+            next_step_method = step_method_name(step_number + 1)
+            if respond_to? next_step_method
 
-            callback = "#{self.class}##{next_step_method}"
-            overall.on(:complete, callback, options)
+              callback = "#{self.class}##{next_step_method}"
+              step_batch.on(:complete, callback, options)
+            end
+            step_batch.jobs do
+              send(step_method_name(step_number), status, options)
+              NoOpWorker.perform_async
+            end
           end
-          overall.jobs do
-            send(step_method_name(step_number), overall.status, options)
-            NoOpWorker.perform_async
-          end
-          overall
+          step_batch
         end
       end
     end

@@ -103,13 +103,33 @@ RSpec.describe Sidekiq::SimpleWorkflow do
   end
 
   describe "#perform" do
-    context "when a batch has multiple steps" do
+    context "when a batch has a single step" do
+      it "the first batch has a description that matches the class" do
+        first_id = 1
+
+        batch = OneStepFlow.new.start_workflow(id: first_id)
+
+        expect(batch.description).to eq("OneStepFlow Parent Batch")
+      end
+
       it "start will trigger the first batch for the first step" do
         first_id = 1
 
-        OneStepFlow.new.perform(id: first_id)
+        OneStepFlow.new.start_workflow(id: first_id)
 
         expect(ExampleJob).to have_enqueued_sidekiq_job(first_id)
+      end
+
+      it "the first batch has a description" do
+        id = 1
+
+        params = { id: id }
+        workflow = OneStepFlow.new
+        workflow.start_workflow(params)
+        batch = workflow.step_1_batch(RSpec::Sidekiq::NullStatus.new, params)
+        batch.status.join
+
+        expect(batch.description).to eq("OneStepFlow step_1 Batch")
       end
     end
 
@@ -123,8 +143,9 @@ RSpec.describe Sidekiq::SimpleWorkflow do
 
       params = { first_id: first_id, second_id: second_id }
       workflow = TwoStepFlow.new
+      workflow.start_workflow(params)
 
-      batch = workflow.step_1_batch(RSpec::Sidekiq::NullStatus, params)
+      batch = workflow.step_1_batch(RSpec::Sidekiq::NullStatus.new, params)
       batch.status.join
       expect(ExampleJob).to have_enqueued_sidekiq_job(second_id)
     end
@@ -137,12 +158,13 @@ RSpec.describe Sidekiq::SimpleWorkflow do
 
       params = { first_id: 1, second_id: 2, third_id: 3, fourth_id: 4 }
       workflow = FourStepFlow.new
+      workflow.start_workflow(params)
 
-      batch = workflow.step_1_batch(RSpec::Sidekiq::NullStatus, params)
+      batch = workflow.step_1_batch(RSpec::Sidekiq::NullStatus.new, params)
       batch.status.join
       expect(ExampleJob).to have_enqueued_sidekiq_job(params[:second_id])
 
-      batch = workflow.step_2_batch(RSpec::Sidekiq::NullStatus, params)
+      batch = workflow.step_2_batch(RSpec::Sidekiq::NullStatus.new, params)
       batch.status.join
       expect(ExampleJob).to have_enqueued_sidekiq_job(params[:third_id])
     end
@@ -156,15 +178,16 @@ RSpec.describe Sidekiq::SimpleWorkflow do
         and_return(parent_bid)
 
       params = { first_id: first_id, second_id: second_id }
-      workflow = TwoStepFlow.new.perform(params)
+      workflow = TwoStepFlow.new
+      workflow.start_workflow(params)
 
-      batch = workflow.step_1_batch(RSpec::Sidekiq::NullStatus, params)
+      batch = workflow.step_1_batch(RSpec::Sidekiq::NullStatus.new, params)
       batch.status.join
 
-      batch = workflow.step_2_batch(RSpec::Sidekiq::NullStatus, params)
+      batch = workflow.step_2_batch(RSpec::Sidekiq::NullStatus.new, params)
       batch.status.join
 
-      batch = workflow.step_3_batch(RSpec::Sidekiq::NullStatus, params)
+      batch = workflow.step_3_batch(RSpec::Sidekiq::NullStatus.new, params)
       batch&.status&.join
     end
 
@@ -187,33 +210,34 @@ RSpec.describe Sidekiq::SimpleWorkflow do
         ninth_id: id,
         tenth_id: id,
       }
-      workflow = TwoStepFlow.new.perform(params)
+      workflow = TwoStepFlow.new
+      workflow.start_workflow(params)
 
-      batch = workflow.step_1_batch(RSpec::Sidekiq::NullStatus, params)
+      batch = workflow.step_1_batch(RSpec::Sidekiq::NullStatus.new, params)
       batch.status.join
 
-      batch = workflow.step_2_batch(RSpec::Sidekiq::NullStatus, params)
+      batch = workflow.step_2_batch(RSpec::Sidekiq::NullStatus.new, params)
       batch.status.join
 
-      batch = workflow.step_4_batch(RSpec::Sidekiq::NullStatus, params)
+      batch = workflow.step_4_batch(RSpec::Sidekiq::NullStatus.new, params)
       batch&.status&.join
 
-      batch = workflow.step_5_batch(RSpec::Sidekiq::NullStatus, params)
+      batch = workflow.step_5_batch(RSpec::Sidekiq::NullStatus.new, params)
       batch&.status&.join
 
-      batch = workflow.step_6_batch(RSpec::Sidekiq::NullStatus, params)
+      batch = workflow.step_6_batch(RSpec::Sidekiq::NullStatus.new, params)
       batch&.status&.join
 
-      batch = workflow.step_7_batch(RSpec::Sidekiq::NullStatus, params)
+      batch = workflow.step_7_batch(RSpec::Sidekiq::NullStatus.new, params)
       batch&.status&.join
 
-      batch = workflow.step_8_batch(RSpec::Sidekiq::NullStatus, params)
+      batch = workflow.step_8_batch(RSpec::Sidekiq::NullStatus.new, params)
       batch&.status&.join
 
-      batch = workflow.step_9_batch(RSpec::Sidekiq::NullStatus, params)
+      batch = workflow.step_9_batch(RSpec::Sidekiq::NullStatus.new, params)
       batch&.status&.join
 
-      batch = workflow.step_10_batch(RSpec::Sidekiq::NullStatus, params)
+      batch = workflow.step_10_batch(RSpec::Sidekiq::NullStatus.new, params)
       batch&.status&.join
     end
 
@@ -226,10 +250,10 @@ RSpec.describe Sidekiq::SimpleWorkflow do
         allow(RSpec::Sidekiq::NullStatus).
           to receive(:parent_bid).
           and_return(parent_bid)
-        batch = RSpec::Sidekiq::NullBatch.new
 
         workflow = EmptyFlow.new
-        batch = workflow.step_1_batch(batch.status, options)
+        workflow.start_workflow(options)
+        batch = workflow.step_1_batch(RSpec::Sidekiq::NullStatus.new, options)
         batch.status.join
 
         expect(ExampleJob).to have_enqueued_sidekiq_job(second_id)
