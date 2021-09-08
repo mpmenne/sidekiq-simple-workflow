@@ -34,6 +34,9 @@ module Sidekiq
           NoOpWorker.perform_async
         end
       end
+      if Sidekiq::Testing.enabled?
+        send("step_2_batch", RSpec::Sidekiq::NullStatus.new, args)
+      end
       step_batch
     end
 
@@ -55,6 +58,9 @@ module Sidekiq
               send(step_method_name(step_number), status, options)
               NoOpWorker.perform_async
             end
+          end
+          if Sidekiq::Testing.enabled?
+            send("step_#{step_number + 1}_batch", RSpec::Sidekiq::NullStatus.new, options)
           end
           step_batch
         end
