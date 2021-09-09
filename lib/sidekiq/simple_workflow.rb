@@ -35,7 +35,7 @@ module Sidekiq
         end
       end
       if defined?(Sidekiq::Testing) && Sidekiq::Testing.enabled?
-        send("step_2_batch", RSpec::Sidekiq::NullStatus.new, args)
+        step_batch.status.join
       end
       step_batch
     end
@@ -51,7 +51,7 @@ module Sidekiq
             next_step_method = step_method_name(step_number + 1)
             if respond_to? next_step_method
 
-              callback = "#{self.class}##{next_step_method}"
+              callback = callback_method(step_number + 1)
               step_batch.on(:complete, callback, options)
             end
             step_batch.jobs do
@@ -60,7 +60,7 @@ module Sidekiq
             end
           end
           if defined?(Sidekiq::Testing) && Sidekiq::Testing.enabled?
-            send("step_#{step_number + 1}_batch", RSpec::Sidekiq::NullStatus.new, options)
+            step_batch.status.join
           end
           step_batch
         end
