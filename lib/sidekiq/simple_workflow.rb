@@ -19,28 +19,7 @@ module Sidekiq
       parent_batch
     end
 
-    def step_1_batch(status, args)
-      step_batch = nil
-      original_batch = Sidekiq::Batch.new(status.bid)
-      original_batch.jobs do
-        step_batch = Sidekiq::Batch.new
-        step_batch.description = "#{self.class} step_1 Batch"
-        if respond_to? :step_2
-          callback = "#{self.class}#step_2_batch"
-          step_batch.on(:complete, callback, args)
-        end
-        step_batch.jobs do
-          send(step_method_name(1), nil, args)
-          NoOpWorker.perform_async
-        end
-      end
-      if defined?(Sidekiq::Testing) && Sidekiq::Testing.enabled?
-        step_batch.status.join
-      end
-      step_batch
-    end
-
-    (2..10).each do |step_number|
+    (1..10).each do |step_number|
       define_method("step_#{step_number}_batch") do |status, options|
         if respond_to? step_method_name(step_number)
           step_batch = nil
