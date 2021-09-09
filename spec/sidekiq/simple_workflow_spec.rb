@@ -153,12 +153,14 @@ RSpec.describe Sidekiq::SimpleWorkflow do
         to receive(:parent_bid).
         and_return(parent_bid)
 
-      params = { first_id: 1, second_id: 2, third_id: 3, fourth_id: 4 }
+      params = { id: 1, second_id: 2, third_id: 3, fourth_id: 4 }
       workflow = FourStepFlow.new
       workflow.start_workflow(params)
 
+      expect(ExampleJob).to have_enqueued_sidekiq_job(params[:id])
       expect(ExampleJob).to have_enqueued_sidekiq_job(params[:second_id])
       expect(ExampleJob).to have_enqueued_sidekiq_job(params[:third_id])
+      expect(ExampleJob).to have_enqueued_sidekiq_job(params[:fourth_id])
     end
 
     it "only triggers steps that exist" do
