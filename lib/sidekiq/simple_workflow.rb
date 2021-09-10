@@ -31,7 +31,7 @@ module Sidekiq
             if respond_to? next_step_method
 
               callback = callback_method(step_number + 1)
-              step_batch.on(:complete, callback, options)
+              step_batch.on(:success, callback, options)
             end
             step_batch.jobs do
               send(step_method_name(step_number), status, options)

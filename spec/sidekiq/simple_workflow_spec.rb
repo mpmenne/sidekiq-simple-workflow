@@ -131,6 +131,17 @@ RSpec.describe Sidekiq::SimpleWorkflow do
 
         expect(batch.description).to eq("OneStepFlow step_1 Batch")
       end
+
+      it "the batch callback should fire on success" do
+        id = 1
+
+        params = { id: id }
+        workflow = TwoStepFlow.new
+        workflow.start_workflow(params)
+        batch = workflow.step_1_batch(RSpec::Sidekiq::NullStatus.new, params)
+
+        expect(batch.instance_variable_get("@callbacks").flatten.first).to eq(:success)
+      end
     end
 
     it "triggers the second step after the first step" do
